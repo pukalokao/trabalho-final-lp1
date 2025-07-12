@@ -1,120 +1,126 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <locale.h>
 
 typedef struct {
     char nome[30];
     int custo;
     float retorno;
-} acao;
+} Acao;
 
 
-void liberarmemoria(float **dp, int i, int n){
+void liberarmemoria(float **matrizD, int i, int n){
     if (i >= n){
-        free(dp);
+        free(matrizD);
         return;
     }
-    free(dp[i]);
-    liberarmemoria(dp, i + 1, n);
+    free(matrizD[i]);
+    liberarmemoria(matrizD, i + 1, n);
 
 }
 // knapsack problem (programação dinâmica)
-float combinacao_otima(acao *acoes, int n_acoes, int capital, int *selecionadas){
-    float **dp = malloc((n_acoes + 1) * sizeof(float *));
-    for(int i = 0; i <= n_acoes; i++){
-        dp[i] = calloc((capital + 1), sizeof(float));
+float melhorInvestimento(Acao *listaAcoes, int num_acoes, int capital, int *selecionadas){
+    float **matrizD = malloc((num_acoes + 1) * sizeof(float *));
+    for(int i = 0; i <= num_acoes; i++){
+        matrizD[i] = calloc((capital + 1), sizeof(float));
     }
-    for(int i = 1; i <= n_acoes; i++){
+    for(int i = 1; i <= num_acoes; i++){
         for(int j = 0; j <= capital; j++){
-            if(acoes[i-1].custo > j){
-                dp[i][j] = dp[i - 1][j];
+            if(listaAcoes[i-1].custo > j){
+                matrizD[i][j] = matrizD[i - 1][j];
             }
             else {
-                float naoInclui = dp[i - 1][j];
-                float inclui = dp[i - 1][j - acoes[i - 1].custo] + acoes[i-1].retorno;
-                dp[i][j] = (inclui > naoInclui) ? inclui : naoInclui;
+                float naoInclui = matrizD[i - 1][j];
+                float inclui = matrizD[i - 1][j - listaAcoes[i - 1].custo] + listaAcoes[i-1].retorno;
+                matrizD[i][j] = (inclui > naoInclui) ? inclui : naoInclui;
             }
         }
     }
-    int restante = capital;
-    for(int i = n_acoes; i > 0; i--){
-        if(dp[i][restante] != dp[i - 1][restante]){
+    int capitalRestante = capital;
+    for(int i = num_acoes; i > 0; i--){
+        if(matrizD[i][capitalRestante] != matrizD[i - 1][capitalRestante]){
             selecionadas[i - 1] = 1;
-            restante -= acoes[i - 1].custo;
+            capitalRestante -= listaAcoes[i - 1].custo;
         } else {
             selecionadas[i - 1] = 0;
         }
     }
-    float resultado = dp[n][capital];
-    liberarmemoria(dp, 0, n);
+    float resultado = matrizD[num_acoes][capital];
+    liberarmemoria(matrizD, 0, num_acoes);
 
     return resultado;
 }
 
-acao *lerArquivo(const char *nomeArquivo, int *n, int *capital){
-    FILE *file = fopen(nomeArquivo, "r");
-    if(file == NULL){
+Acao *lerArquivo(const char *nomeArquivo, int *num_acoes, int *capital){
+    FILE *arquivo = fopen(nomeArquivo, "r");
+    if(arquivo == NULL){
         perror("erro ao abrir arquivo");
         exit(1);
     }
     char linha[150];
-    *n = 0;
+    *num_acoes = 0;
     int capacidade = 50;
-    acao *array = malloc(capacidade * sizeof(acao));
+    Acao *acoes = malloc(capacidade * sizeof(Acao));
+    if(acoes == NULL) {
+        perror("Erro ao alocar memória inicial para ações");
+        exit(EXIT_FAILURE);
+    }
 
-    while (fgets(linha, sizeof(linha), file)){
+    while (fgets(linha, sizeof(linha), arquivo)){
         if(strncmp(linha, "CAPITAL_DISPONIVEL_R$:", strlen("CAPITAL_DISPONIVEL_R$:")) == 0){
-            float temp;
-            sscanf(linha, "CAPITAL_DISPONIVEL_R$: %f", &temp);
-            *capital = (int)(temp + 0.5);
+            float capitalFloat;
+            sscanf(linha, "CAPITAL_DISPONIVEL_R$: %f", &capitalFloat);
+            *capital = (int)(capitalFloat + 0.5);
             break;
         }
     }
-    while (fgets(linha, sizeof(linha), file)){
+    while (fgets(linha, sizeof(linha), arquivo)){
         if (strncmp(linha, "ACOES:", 6) == 0){
             break;
         }
     }
-    char id[10], nomeTemp[50];
-    int custoint;
-    float retornofloat;
+    char idAcao[10], nomeAcaoTemp[50];
+    float custoAcaoTemp;
+    float retornoAcaoTemp;
 
-    while (fgets(linha, sizeof(linha), file)){
-        if(sscanf(linha, "%s %d %f %[^\n]", id, &custoint, &retornofloat, nomeTemp) == 4){
-            if(*n >= capacidade){
+    while (fgets(linha, sizeof(linha), arquivo)){
+        if(sscanf(linha, "%s %f %f %[^\n]", idAcao, &custoAcaoTemp, &retornoAcaoTemp, nomeAcaoTemp) == 4){
+            if(*num_acoes >= capacidade){
                 capacidade *= 2;
-                array = realloc(array, capacidade * sizeof(acao));
+                acoes = realloc(acoes, capacidade * sizeof(Acao));
+
             }
-            strncpy(array[*n].nome, nomeTemp, sizeof(array[*n].nome) - 1);
-            array[*n].nome[sizeof(array[*n].nome) - 1] = '\0';
-            array[*n].custo = custoint;
-            array[*n].retorno = retornofloat;
-            (*n)++;
+            strncpy(acoes[*num_acoes].nome, nomeAcaoTemp, sizeof(acoes[*num_acoes].nome) - 1);
+            acoes[*num_acoes].nome[sizeof(acoes[*num_acoes].nome) - 1] = '\0';
+            acoes[*num_acoes].custo = custoAcaoTemp;
+            acoes[*num_acoes].retorno = retornoAcaoTemp;
+            (*num_acoes)++;
         }
     }
-    fclose(file);
-    return array;
+    fclose(arquivo);
+    return acoes;
 }
 
-void exibirResultado(acao *acoes, int n, int capital, int melhorcomb, int melhorCusto, float maiorRetorno ){
+void exibirResultado(Acao *listaAcoes, int num_acoes, int capital, int melhorCombinacao, int custoTotal, float retornoMaximo ){
     printf("\n----------------------------------------\n");
     printf("Carteira de Investimentos Otimizada\n");
     printf("----------------------------------------\n");
     printf("Capital Disponível: R$ %d\n\n", capital);
     printf("Ações a Comprar:\n");
 
-    for(int j = 0; j < n; j++){
-        if(melhorcomb & (1 << j)){
-            printf("- %s (Custo: R$ %d, Retorno: %.2f%%)\n", acoes[j].nome, acoes[j].custo, acoes[j].retorno);
+    for(int j = 0; j < num_acoes; j++){
+        if(melhorCombinacao & (1 << j)){
+            printf("- %s (Custo: R$ %d, Retorno: %.2f%%)\n", listaAcoes[j].nome, listaAcoes[j].custo, listaAcoes[j].retorno);
         }
     }
     printf("\nResumo da Carteira:\n");
-    printf("- Custo Total: R$ %d\n", melhorCusto);
-    printf("- Retorno Máximo Esperado: %.2f%%\n", maiorRetorno);
+    printf("- Custo Total: R$ %d\n", custoTotal);
+    printf("- Retorno Máximo Esperado: %.2f%%\n", retornoMaximo);
     printf("----------------------------------------\n");
 }
 
-void exibirResultadoPD(acao *acoes, int n, int capital, int *selecionadas, float retornoMaximo){
+void exibirResultadoPD(Acao *listaAcoes, int num_acoes, int capital, int *selecionadas, float retornoMaximo){
     printf("\n----------------------------------------\n");
     printf("Carteira de Investimentos Otimizada\n");
     printf("----------------------------------------\n");
@@ -122,10 +128,10 @@ void exibirResultadoPD(acao *acoes, int n, int capital, int *selecionadas, float
     printf("Ações a Comprar:\n");
 
     int custoTotal = 0;
-    for(int i = 0; i < n; i++){
+    for(int i = 0; i < num_acoes; i++){
         if(selecionadas[i]){
-            printf("- %s (Custo: R$ %d, Retorno: %.2f%%)\n", acoes[i].nome, acoes[i].custo, acoes[i].retorno);
-            custoTotal += acoes[i].custo;
+            printf("- %s (Custo: R$ %d, Retorno: %.2f%%)\n", listaAcoes[i].nome, listaAcoes[i].custo, listaAcoes[i].retorno);
+            custoTotal += listaAcoes[i].custo;
         }
     }
 
@@ -136,27 +142,28 @@ void exibirResultadoPD(acao *acoes, int n, int capital, int *selecionadas, float
 }
 
 int main(){
-    int n, capital;
+    setlocale(LC_ALL, "Portuguese");
+    int numeroAcoes, capital;
     char nomeArquivo[100];
 
     printf("Digite o nome do arquivo: ");
     scanf("%s", nomeArquivo);
 
-    acao *array = lerArquivo(nomeArquivo, &n, &capital);
+    Acao *lista_Acoes = lerArquivo(nomeArquivo, &numeroAcoes, &capital);
 
-    if(n == 0){
+    if(numeroAcoes == 0){
         printf("Nenhuma ação foi lida. Verifique o arquivo.\n");
-        free(array);
+        free(lista_Acoes);
         return 1;
     }
 
-    printf("Foram lidas %d ações. Capital disponível: R$ %d\n", n, capital);
+    printf("Foram lidas %d ações. Capital disponível: R$ %d\n", numeroAcoes, capital);
 
     printf("========================== Acoes ==========================\n");
     printf("-----------------------------------------------------------\n");
     printf("%-20s | %-10s | %-10s\n", "Nome", "Custo", "Retorno");
-    for(int i = 0; i < n; i++){
-        printf("%-20s | %10d | Retorno: %9.2f%%\n", array[i].nome, array[i].custo, array[i].retorno);
+    for(int i = 0; i < numeroAcoes; i++){
+        printf("%-20s | %10d | Retorno: %9.2f%%\n", lista_Acoes[i].nome, lista_Acoes[i].custo, lista_Acoes[i].retorno);
     }
 
     // Método máscara de bit (pode ser muito lento para muitas ações)
@@ -168,11 +175,11 @@ int main(){
     */
 
     // Mochila dinâmica
-    int *selecionadas = calloc(n, sizeof(int));
-    float retornoMaximo = combinacao_otima(array, n, capital, selecionadas);
-    exibirResultadoPD(array, n, capital, selecionadas, retornoMaximo);
+    int *selecionadas = calloc(numeroAcoes, sizeof(int));
+    float retornoMaximo = melhorInvestimento(lista_Acoes, numeroAcoes, capital, selecionadas);
+    exibirResultadoPD(lista_Acoes, numeroAcoes, capital, selecionadas, retornoMaximo);
 
-    free(array);
+    free(lista_Acoes);
     free(selecionadas);
     return 0;
 }
